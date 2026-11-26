@@ -38,19 +38,19 @@ const FX = (() => {
   const CC = ['#ff8a3d', '#f26b21', '#ffe3a8', '#f2c879', '#ffffff', '#ffb27a', '#e0452b'];
   function size() { const D = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * D; cv.height = H * D; ctx.setTransform(D, 0, 0, D, 0, 0); }
   addEventListener('resize', size); size();
-  const nb = any => ({ x: Math.random() * W, y: any ? Math.random() * H : H + 20, r: 2 + Math.random() * 5, vy: .1 + Math.random() * .3, a: .12 + Math.random() * .35, ph: Math.random() * 6.28 });
+  const nb = any => ({ x: Math.random() * W, y: any ? Math.random() * H : H + 20, r: 1 + Math.random() * 2.6, vy: .08 + Math.random() * .25, a: .25 + Math.random() * .5, ph: Math.random() * 6.28 });
   const np = () => ({ x: Math.random() * W, y: -20 - Math.random() * H * .9, s: 6 + Math.random() * 7, vy: .5 + Math.random() * 1, vx: -.3 + Math.random() * .6, rot: Math.random() * 6.28, vr: -.03 + Math.random() * .06, ph: Math.random() * 6.28, c: PC[Math.random() * PC.length | 0] });
   for (let i = 0; i < (RM ? 8 : 22); i++) bokeh.push(nb(true));
   // ভাসমান আলোর বিন্দুর ছবি একবারই আঁকা হয়
   const bk = document.createElement('canvas'); bk.width = bk.height = 64;
-  { const x = bk.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,214,150,1)'); gr.addColorStop(1, 'rgba(255,214,150,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); }
+  { const x = bk.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,246,220,1)'); gr.addColorStop(.12, 'rgba(255,214,150,.9)'); gr.addColorStop(.35, 'rgba(255,170,90,.28)'); gr.addColorStop(1, 'rgba(255,150,70,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); }
   function heart(s) { ctx.beginPath(); ctx.moveTo(0, s * .3); ctx.bezierCurveTo(0, 0, -s * .5, 0, -s * .5, s * .3); ctx.bezierCurveTo(-s * .5, s * .6, 0, s * .8, 0, s); ctx.bezierCurveTo(0, s * .8, s * .5, s * .6, s * .5, s * .3); ctx.bezierCurveTo(s * .5, 0, 0, 0, 0, s * .3); ctx.fill(); }
   function tick() {
     ctx.clearRect(0, 0, W, H);
     for (const b of bokeh) {
       b.y -= b.vy; b.ph += .01; if (b.y < -20) Object.assign(b, nb(false));
-      const x = b.x + Math.sin(b.ph) * 12, rr = b.r * 3;
-      ctx.globalAlpha = b.a; ctx.drawImage(bk, x - rr, b.y - rr, rr * 2, rr * 2);
+      const x = b.x + Math.sin(b.ph) * 12, rr = b.r * 4;
+      ctx.globalAlpha = b.a * (.55 + .45 * Math.sin(b.ph * 3)); ctx.drawImage(bk, x - rr, b.y - rr, rr * 2, rr * 2);
     }
     ctx.globalAlpha = 1;
     const want = petalOn ? (RM ? 6 : W < 600 ? 18 : 30) : 0;

@@ -36,6 +36,26 @@ function sample(lines, W, H, step) {
   for (let y = 0; y < off.height; y += step) for (let x = 0; x < w; x += step) if (d[(y * w + x) * 4 + 3] > 120) pts.push([x + (Math.random() - .5) * step * .6, y + (Math.random() - .5) * step * .6]);
   return pts;
 }
+// কণাগুলো জায়গায় বসার পর নিচে ফুটে ওঠা ঝকঝকে সোনালি লেখা (যাতে পড়া যায়)
+function crisp(lines, W, H, dpr, glowA = .6) {
+  const mk = () => { const c = document.createElement('canvas'); c.width = Math.ceil(W * dpr); c.height = Math.ceil(H * dpr); const x = c.getContext('2d'); x.scale(dpr, dpr); return [c, x]; };
+  const [t, tx] = mk(); tx.textAlign = 'center'; tx.textBaseline = 'middle';
+  let top = H, bot = 0;
+  for (const L of lines) {
+    tx.font = fontOf(L); const w = tx.measureText(L.text).width, max = W * .9; let s = L.size;
+    if (w > max) { s = L.size * max / w; tx.font = fontOf(L, s); }
+    tx.fillStyle = '#fff'; tx.fillText(L.text, L.x, L.y);
+    top = Math.min(top, L.y - s * .6); bot = Math.max(bot, L.y + s * .6);
+  }
+  tx.globalCompositeOperation = 'source-in';
+  const gr = tx.createLinearGradient(0, top, 0, bot);
+  gr.addColorStop(0, '#fff7e4'); gr.addColorStop(.45, '#ffd99c'); gr.addColorStop(1, '#f39a4c');
+  tx.fillStyle = gr; tx.fillRect(0, 0, W, H);
+  const [c, cx] = mk(); cx.setTransform(1, 0, 0, 1, 0, 0);
+  try { cx.filter = `blur(${Math.round(9 * dpr)}px)`; cx.globalAlpha = glowA; cx.drawImage(t, 0, 0); cx.filter = 'none'; } catch (e) { }
+  cx.globalAlpha = 1; cx.drawImage(t, 0, 0);
+  return c;
+}
 function makeParts(pts, max, from) {
   const stride = Math.max(1, Math.ceil(pts.length / max)), out = [];
   for (let i = 0; i < pts.length; i += stride) {
@@ -46,26 +66,27 @@ function makeParts(pts, max, from) {
   }
   return out;
 }
-function stepParts(ctx, parts, t, ptr, k, R = 80) {
+function stepParts(ctx, parts, t, ptr, k, R = 80, dim = 1) {
   ctx.globalCompositeOperation = 'lighter';
   for (const p of parts) {
     const dx = p.x - ptr.x, dy = p.y - ptr.y, d2 = dx * dx + dy * dy;
     if (d2 < R * R) { const d = Math.sqrt(d2) || 1, f = (R - d) / R * 5; p.vx += dx / d * f; p.vy += dy / d * f; }
     p.vx = (p.vx + (p.tx - p.x) * k) * .86; p.vy = (p.vy + (p.ty - p.y) * k) * .86; p.x += p.vx; p.y += p.vy;
-    ctx.globalAlpha = .55 + .45 * Math.sin(t * 3 + p.ph);
-    const sz = p.s * 5; ctx.drawImage(glow(p.c, 4), p.x - sz / 2, p.y - sz / 2, sz, sz);
+    ctx.globalAlpha = (.55 + .45 * Math.sin(t * 3 + p.ph)) * dim;
+    const sz = p.s * 4.2; ctx.drawImage(glow(p.c, 4), p.x - sz / 2, p.y - sz / 2, sz, sz);
   }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 }
 
 /* ---------- তারার আকাশে নাম ---------- */
 function ParticleText(cv, o) {
-  let ctx, W, H, dpr, parts = [], stars = [], shoots = [], raf, alive = true, t0 = performance.now();
+  let ctx, W, H, dpr, parts = [], stars = [], shoots = [], raf, alive = true, t0 = performance.now(), sharp = null;
   const ptr = { x: -1e4, y: -1e4 };
   (async () => {
     ({ ctx, W, H, dpr } = fit(cv));
     const lines = o.lines(W, H); await fontsReady(lines); if (!alive) return;
-    parts = makeParts(sample(lines, W, H, W < 500 ? 3 : 4), W < 500 ? 1800 : 3000, { random: true, W, H });
+    parts = makeParts(sample(lines, W, H, W < 500 ? 3 : 4), W < 500 ? 1500 : 2600, { random: true, W, H });
+    sharp = crisp(lines, W, H, dpr);
     stars = Array.from({ length: Math.round(W * H / 2600) }, () => ({ x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.4 + .3, ph: Math.random() * 6.28, sp: .5 + Math.random() * 2 }));
     raf = requestAnimationFrame(frame);
   })();
@@ -85,7 +106,9 @@ function ParticleText(cv, o) {
       ctx.strokeStyle = gr; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * 16, s.y - s.vy * 16); ctx.stroke();
       ctx.drawImage(glow('#ffe3a8', 7), s.x - 14, s.y - 14);
     }
-    stepParts(ctx, parts, t, ptr, .012 + .035 * Math.min(1, t / 2.5));
+    const a = sharp ? Math.max(0, Math.min(1, (t - 2.3) / 1.6)) : 0, ae = a * a * (3 - 2 * a);
+    if (ae > 0) { ctx.globalAlpha = ae; ctx.drawImage(sharp, 0, 0, W, H); ctx.globalAlpha = 1; }
+    stepParts(ctx, parts, t, ptr, .012 + .035 * Math.min(1, t / 2.5), 80, 1 - .45 * ae);
     raf = requestAnimationFrame(frame);
   }
   const pos = e => { const rc = cv.getBoundingClientRect(); return [e.clientX - rc.left, e.clientY - rc.top]; };
@@ -101,7 +124,7 @@ function ParticleText(cv, o) {
 
 /* ---------- আতশবাজি ---------- */
 function Fireworks(cv, o) {
-  let { ctx, W, H, dpr } = fit(cv), rockets = [], sparks = [], text = [], raf, alive = true, t0 = performance.now(), nextAuto = .3, textAt = o.textDelay || 3;
+  let { ctx, W, H, dpr } = fit(cv), rockets = [], sparks = [], text = [], raf, alive = true, t0 = performance.now(), nextAuto = .3, textAt = o.textDelay || 3, sharp = null, sharpAt = 0;
   const ptr = { x: -1e4, y: -1e4 };
   const launch = (x, ty, kind) => { rockets.push({ x, y: H + 10, vx: (Math.random() - .5) * 1.2, vy: -Math.sqrt(2 * .12 * (H + 10 - ty)), kind, c: FW[Math.random() * FW.length | 0] }); };
   function explode(x, y, kind, c, scale = 1) {
@@ -118,7 +141,8 @@ function Fireworks(cv, o) {
     const lines = o.lines(W, H); await fontsReady(lines); if (!alive) return;
     const cx = W / 2, cy = lines[0].y;
     explode(cx, cy, 'sphere', '#ffd36e', 1.6);
-    text = makeParts(sample(lines, W, H, W < 500 ? 3 : 4), W < 500 ? 1700 : 2800, { x: cx, y: cy });
+    text = makeParts(sample(lines, W, H, W < 500 ? 3 : 4), W < 500 ? 1500 : 2600, { x: cx, y: cy });
+    sharp = crisp(lines, W, H, dpr, .35); sharpAt = (performance.now() - t0) / 1000 + 1.4;
     if (o.onText) o.onText();
   }
   function frame(now) {
@@ -144,7 +168,9 @@ function Fireworks(cv, o) {
       ctx.globalAlpha = Math.min(1, p.life * 1.4); const sz = p.s * 6; ctx.drawImage(glow(p.c, 4), p.x - sz / 2, p.y - sz / 2, sz, sz);
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-    if (text.length) stepParts(ctx, text, t, ptr, .03);
+    const a = sharp ? Math.max(0, Math.min(1, (t - sharpAt) / 1.6)) : 0, ae = a * a * (3 - 2 * a);
+    if (ae > 0) { ctx.globalAlpha = .55 * ae; ctx.drawImage(sharp, 0, 0, W, H); ctx.globalAlpha = 1; }
+    if (text.length) stepParts(ctx, text, t, ptr, .03, 80, 1 - .5 * ae);
     raf = requestAnimationFrame(frame);
   }
   ctx.fillStyle = '#100502'; ctx.fillRect(0, 0, cv.width, cv.height);
