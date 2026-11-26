@@ -139,7 +139,7 @@ function Fireworks(cv, o) {
   }
   async function startText() {
     const lines = o.lines(W, H); await fontsReady(lines); if (!alive) return;
-    const cx = W / 2, cy = lines[0].y;
+    const cx = W / 2, cy = lines.length ? lines[0].y : H * .25;
     explode(cx, cy, 'sphere', '#ffd36e', 1.6);
     text = makeParts(sample(lines, W, H, W < 500 ? 3 : 4), W < 500 ? 1500 : 2600, { x: cx, y: cy });
     sharp = crisp(lines, W, H, dpr, .35); sharpAt = (performance.now() - t0) / 1000 + 1.4;

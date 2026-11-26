@@ -468,3 +468,7 @@ h2{font-family:var(--disp);font-size:clamp(25px,6.6vw,36px);line-height:1.5;lett
 .g-name{font-family:var(--disp);background:var(--goldtxt);-webkit-background-clip:text;background-clip:text;color:transparent}
 .note p,.lightbox figcaption{font-family:var(--disp)}
 .cap{font-family:var(--disp);font-size:16.5px}
+
+/* সম্পাদনার পাতায় বন্ধ করা (বা খালি) লেখার জায়গা পুরো উঠে যায় */
+.kicker:empty,h2:empty,.sub:empty,.sky-line:empty,.env-line:empty,.env-card .script:empty,.env-card .nm:empty,
+.l-greet:empty,.l-close:empty,.l-sign:empty,.fin-line:empty,.final-sign:empty,.wish .script:empty,.counter small:empty,.g-name:empty,.g-q:empty{display:none}

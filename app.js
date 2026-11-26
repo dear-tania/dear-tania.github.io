@@ -20,7 +20,8 @@ let C = {};
 let BOX = null;   // লাইভ পাতায় তালাবদ্ধ লেখা (উত্তর দিলে খোলে)
 // তালিকার প্রতিটা জিনিস লেখা হতে পারে, অথবা {text, hide}; লুকানো আর খালিগুলো বাদ
 const shownItems = arr => (arr || []).filter(x => x && !(typeof x === 'object' && x.hide)).map(x => typeof x === 'object' ? x.text || '' : x).filter(Boolean);
-const g = (p, d = '') => { const v = p.split('.').reduce((o, k) => (o == null ? o : o[k]), C); return v == null || v === '' ? d : v; };
+// C.off = সম্পাদনার পাতায় চোখ-বোতামে বন্ধ করা লেখা: সেখানে কিছুই বসবে না (নমুনা বা মূল নামও নয়)
+const g = (p, d = '') => { if (C && Array.isArray(C.off) && C.off.includes(p)) return ''; const v = p.split('.').reduce((o, k) => (o == null ? o : o[k]), C); return v == null || v === '' ? d : v; };
 const vib = ms => { try { if (!PREVIEW && navigator.vibrate) navigator.vibrate(ms); } catch (e) { } };
 function deepFill(t, s) { for (const k in s) { if (t[k] === undefined) t[k] = JSON.parse(JSON.stringify(s[k])); else if (s[k] && typeof s[k] === 'object' && !Array.isArray(s[k]) && t[k] && typeof t[k] === 'object') deepFill(t[k], s[k]); } return t; }
 
@@ -211,8 +212,8 @@ const T = {
       <p class="g-msg" aria-live="polite"></p>
     </div>`,
   countdown: () => `
-    <p class="kicker">আর একটু অপেক্ষা…</p>
-    <h2>তোমার দিনটা আসছে</h2>
+    <p class="kicker">${esc(g('countdown.kicker', 'আর একটু অপেক্ষা…'))}</p>
+    <h2>${esc(g('countdown.title', 'তোমার দিনটা আসছে'))}</h2>
     <div class="cd"><div><b data-k="d">০</b><small>দিন</small></div><div><b data-k="h">০</b><small>ঘণ্টা</small></div><div><b data-k="m">০</b><small>মিনিট</small></div><div><b data-k="s">০</b><small>সেকেন্ড</small></div></div>`,
   stars: () => `
     <canvas class="sky-cv" aria-label="${esc(skyName())}"></canvas>
@@ -229,14 +230,14 @@ const T = {
     <p class="env-line">${nl(g('envelope.line'))}</p>`,
   garden: () => {
     const days = Math.floor((Date.now() - Date.parse(g('since'))) / 864e5);
-    return `<p class="kicker">ফুলের বাগান</p><h2>${esc(g('garden.title'))}</h2><p class="sub">${nl(g('garden.sub'))}</p>
+    return `<p class="kicker">${esc(g('garden.kicker', 'ফুলের বাগান'))}</p><h2>${esc(g('garden.title'))}</h2><p class="sub">${nl(g('garden.sub'))}</p>
       ${days > 0 && !g('hideCounter', false) ? `<div class="counter"><small>${esc(g('sinceLabel', 'একসঙ্গে'))}</small><b data-to="${days}">০</b><span>দিন</span>
         <div class="hms"><i data-k="h">০</i> ঘণ্টা <i data-k="m">০</i> মিনিট <i data-k="s">০</i> সেকেন্ড</div></div>` : ''}
       <div class="garden-glow"></div><div class="garden-rays"></div><canvas class="garden-cv" aria-label="গোলাপবাগান"></canvas>`;
   },
   memories: () => {
     const list = (g('memories', []) || []).filter(m => m && !m.hide);
-    return `<p class="kicker">স্মৃতির মালা</p><h2>${esc(g('memoriesTitle', 'আমাদের গল্প'))}</h2>
+    return `<p class="kicker">${esc(g('memoriesKicker', 'স্মৃতির মালা'))}</p><h2>${esc(g('memoriesTitle', 'আমাদের গল্প'))}</h2>
       <div class="lights"><div class="track">
         <svg class="string" aria-hidden="true"></svg>
         ${list.map((m, i) => `
@@ -259,7 +260,7 @@ const T = {
     const r = shownItems(g('reasons', [])), HC = ['#ff8a3d', '#ffb27a', '#ffd9b8', '#f26b21', '#ff6f4f', '#fff1e2', '#e8560f', '#ffc078'];
     let seed = 5; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const hearts = r.map((_, i) => `<span class="ph" style="left:${(8 + (i % 4) * 21 + rnd() * 6).toFixed(1)}%;bottom:${(5 + Math.floor(i / 4) * 15 + rnd() * 5).toFixed(1)}%;--rot:${(rnd() * 60 - 30).toFixed(0)}deg">${HEART(34, HC[i % HC.length])}</span>`).join('');
-    return `<p class="kicker">ভালোবাসার বয়াম</p><h2>তোমাকে কেন এত ভালোবাসি</h2>
+    return `<p class="kicker">${esc(g('reasonsKicker', 'ভালোবাসার বয়াম'))}</p><h2>${esc(g('reasonsTitle', 'তোমাকে কেন এত ভালোবাসি'))}</h2>
       <button class="jar" type="button" aria-label="ভালোবাসার বয়াম"><span class="jar-lid"></span><span class="jar-body">${hearts}</span></button>
       <div class="jar-dots">${r.map(() => `<i>${HEART(12)}</i>`).join('')}</div>
       <div class="note-pop" hidden><div class="note">${HEART(26, '#f26b21')}<small></small><p></p></div></div>`;
@@ -287,7 +288,7 @@ const T = {
     <canvas class="fw-cv" aria-label="আতশবাজি"></canvas>
     <div class="fin" hidden>
       <p class="fin-line">${nl(g('finale.line'))}</p>
-      <p class="final-sign">${esc(g('finale.love', 'ভালোবাসি, অনেক।'))}<br>${esc(g('finale.sign', g('from')))}</p>
+      <p class="final-sign">${[g('finale.love', 'ভালোবাসি, অনেক।'), g('finale.sign', g('from'))].filter(Boolean).map(esc).join('<br>')}</p>
       <p class="fin-secret"></p>
       <button class="again" type="button" aria-label="আবার শুরু থেকে"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg></button>
     </div>`
@@ -337,7 +338,7 @@ const B = {
   stars(el) {
     AU.ambient(g('music', ''));
     cleanups.push(Magic.ParticleText($('.sky-cv', el), {
-      lines: (W, H) => [{ text: skyName(), size: Math.min(W * .3, H * .2, 190), family: SCRIPT, x: W / 2, y: H * .4 }],
+      lines: (W, H) => skyName() ? [{ text: skyName(), size: Math.min(W * .3, H * .2, 190), family: SCRIPT, x: W / 2, y: H * .4 }] : [],
       onShoot: (x, y) => { FX.burst(x, y, 50); AU.chime(); vib(30); }
     }));
     later(() => $('.sky-line', el).classList.add('show'), 2600);
@@ -488,8 +489,9 @@ const B = {
       textDelay: 2.6,
       lines: (W, H) => {
         const f1 = Math.min(W * .17, 100), f2 = Math.min(W * .24, 150), y = H * (W < 600 ? .19 : .22), nm = g('finale.name', nameText());
-        const L = [{ text: g('finale.title', 'Happy Birthday'), size: f1, family: SCRIPT, x: W / 2, y }];
-        if (nm) L.push({ text: nm, size: f2, family: SCRIPT, x: W / 2, y: y + Math.min(f1, W * .13) * 1.75 });
+        const tt = g('finale.title', 'Happy Birthday'), L = [];
+        if (tt) L.push({ text: tt, size: f1, family: SCRIPT, x: W / 2, y });
+        if (nm) L.push({ text: nm, size: f2, family: SCRIPT, x: W / 2, y: tt ? y + Math.min(f1, W * .13) * 1.75 : y + f1 * .5 });
         return L;
       },
       onBoom: () => { AU.boom(); },
