@@ -85,7 +85,7 @@ const FX = (() => {
 
 /* ================= সুর ও ছোট শব্দ ================= */
 const AU = (() => {
-  let ctx, master, wet, timer, nextT = 0, step = 0, el = null, muted = false, playing = false, wanted = false, src = '', restart, noise;
+  let ctx, master, wet, amb, timer, nextT = 0, step = 0, el = null, muted = false, playing = false, wanted = false, src = '', noise, fadeT, elFade;
   const mf = m => 440 * Math.pow(2, (m - 69) / 12);
   function init() {
     if (PREVIEW) return;
@@ -95,23 +95,32 @@ const AU = (() => {
       const d = ctx.createDelay(); d.delayTime.value = .33; const fb = ctx.createGain(); fb.gain.value = .3;
       const lp = ctx.createBiquadFilter(); lp.frequency.value = 2400; wet = ctx.createGain(); wet.gain.value = .35;
       wet.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); lp.connect(master);
+      // পেছনের সুরের আলাদা পথ: উষ্ণ (উঁচু শব্দ কাটা) আর আস্তে মিলিয়ে দেওয়া যায়
+      const soft = ctx.createBiquadFilter(); soft.type = 'lowpass'; soft.frequency.value = 1500;
+      amb = ctx.createGain(); amb.gain.value = 0; amb.connect(soft); soft.connect(master); soft.connect(wet);
     }
     if (ctx.state === 'suspended') ctx.resume();
   }
   const ok = () => { init(); return !!ctx; };
-  function note(m, t, dur = 1.8, vol = .16) {
+  function note(m, t, dur = 1.8, vol = .16, dest, att = .008, bell = .1) {
     const o = ctx.createOscillator(), o2 = ctx.createOscillator(), gn = ctx.createGain(), g2 = ctx.createGain();
-    o.type = 'sine'; o.frequency.value = mf(m); o2.type = 'sine'; o2.frequency.value = mf(m) * 4.01; g2.gain.value = .1;
-    gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(vol, t + .008); gn.gain.exponentialRampToValueAtTime(.0001, t + dur);
-    o.connect(gn); o2.connect(g2); g2.connect(gn); gn.connect(master); gn.connect(wet);
+    o.type = 'sine'; o.frequency.value = mf(m); o2.type = 'sine'; o2.frequency.value = mf(m) * 4.01; g2.gain.value = bell;
+    gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(vol, t + att); gn.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(gn); o2.connect(g2); g2.connect(gn);
+    if (dest) gn.connect(dest); else { gn.connect(master); gn.connect(wet); }
     o.start(t); o2.start(t); o.stop(t + dur + .05); o2.stop(t + dur + .05);
   }
   const nbuf = () => { if (noise) return noise; const n = ctx.sampleRate * 1.2 | 0; noise = ctx.createBuffer(1, n, ctx.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; return noise; };
-  const CH = [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65]], PAT = [0, 1, 2, 3, 2, 1, 2, 1], STEP = .38;
+  // আট তালের ধীর, বদলাতে থাকা সুর; মাঝে মাঝে বিরতি (-১), প্রতি তালে আলাদা নকশা
+  const CH = [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 67], [52, 55, 59, 64], [57, 60, 64, 69], [50, 53, 57, 60], [55, 59, 62, 65]];
+  const PATS = [[0, 2, 1, 3, -1, 2, -1, 1], [0, -1, 2, 3, 2, -1, 1, -1], [3, 2, 1, -1, 0, -1, 2, -1], [0, 1, -1, 2, -1, 3, -1, -1], [2, -1, 3, 1, -1, 0, -1, -1]];
+  const STEP = .46;
   function sched() {
-    while (nextT < ctx.currentTime + .6) {
-      const c = CH[Math.floor(step / PAT.length) % CH.length], k = step % PAT.length;
-      note(c[PAT[k]] + 12, nextT, 2.2, .075); if (k === 0) note(c[0] - 12, nextT, 3.4, .06);
+    while (nextT < ctx.currentTime + .7) {
+      const bar = Math.floor(step / 8), k = step % 8, c = CH[bar % CH.length], P = PATS[(bar * 3 + (bar >> 3)) % PATS.length], i = P[k];
+      if (i >= 0) note(c[i] + 12, nextT, 2.8, .05, amb, .03, .04);
+      if (k === 0) note(c[0] - 12, nextT, 4.2, .045, amb, .06, .02);
+      if (k === 4 && Math.random() < .3) note(c[(bar + 1) % 4] + 24, nextT + STEP * .5, 2.2, .022, amb, .02, .03);
       nextT += STEP; step++;
     }
   }
@@ -119,17 +128,25 @@ const AU = (() => {
     if (PREVIEW) return;
     if (s !== undefined) src = s;
     wanted = true; if (!ok() || playing) return; playing = true; muteBtn.hidden = false;
+    clearTimeout(fadeT); clearInterval(elFade);
     if (src) { if (!el) { el = new Audio(src); el.loop = true; } el.volume = .8; el.muted = muted; el.play().catch(() => { playing = false; }); return; }
-    nextT = ctx.currentTime + .1; timer = setInterval(sched, 150); sched();
+    const t = ctx.currentTime; amb.gain.cancelScheduledValues(t); amb.gain.setValueAtTime(amb.gain.value, t); amb.gain.linearRampToValueAtTime(1, t + 2.5);
+    nextT = t + .1; timer = setInterval(sched, 150); sched();
   }
-  function stop() { playing = false; clearInterval(timer); clearTimeout(restart); if (el) el.pause(); }
+  function stop() { playing = false; clearInterval(timer); clearTimeout(fadeT); clearInterval(elFade); if (el) el.pause(); }
+  // পেছনের সুর আস্তে মিলিয়ে দেওয়া; এরপর আর নিজে থেকে ফেরে না
+  function fadeOut(sec = 2.5) {
+    wanted = false; if (!playing) return;
+    if (el) { const v0 = el.volume, n = Math.max(1, sec * 10 | 0); let i = 0; clearInterval(elFade); elFade = setInterval(() => { i++; el.volume = Math.max(0, v0 * (1 - i / n)); if (i >= n) { clearInterval(elFade); stop(); } }, 100); return; }
+    if (ctx) { const t = ctx.currentTime; amb.gain.cancelScheduledValues(t); amb.gain.setValueAtTime(amb.gain.value, t); amb.gain.linearRampToValueAtTime(0, t + sec); }
+    clearTimeout(fadeT); fadeT = setTimeout(stop, sec * 1000 + 100);
+  }
   const HB = [[67, .75], [67, .25], [69, 1], [67, 1], [72, 1], [71, 2], [67, .75], [67, .25], [69, 1], [67, 1], [74, 1], [72, 2],
     [67, .75], [67, .25], [79, 1], [76, 1], [72, 1], [71, 1], [69, 2], [77, .75], [77, .25], [76, 1], [72, 1], [74, 1], [72, 3]];
   function birthday() {
-    if (PREVIEW || !ok()) return; stop();
+    if (PREVIEW || !ok()) return; wanted = false; stop();
     const B = .44; let t = ctx.currentTime + .25;
     for (const [m, d] of HB) { note(m, t, 1.6 + d * B, .2); note(m + 12, t, 1.2, .05); t += d * B; }
-    restart = setTimeout(() => ambient(), (t - ctx.currentTime + 1.5) * 1000);
   }
   function chime() { if (PREVIEW || !ok()) return; const t = ctx.currentTime, P = [72, 74, 76, 79, 81, 84], m = P[Math.random() * P.length | 0]; note(m + 12, t, 1.5, .09); note(m + 19, t + .08, 1.3, .06); }
   function pop() {
@@ -147,7 +164,7 @@ const AU = (() => {
   const whoosh = () => noiseHit(300, 1800, .55, .06, 'bandpass');
   function kick() { if (PREVIEW) return; if (ctx && ctx.state === 'suspended') ctx.resume(); if (wanted && !playing) ambient(); }
   function toggle() { muted = !muted; if (master) master.gain.value = muted ? 0 : .6; if (el) el.muted = muted; return muted; }
-  return { init, ambient, birthday, chime, pop, boom, whoosh, kick, toggle, stop };
+  return { init, ambient, fadeOut, birthday, chime, pop, boom, whoosh, kick, toggle, stop };
 })();
 muteBtn.onclick = () => muteBtn.classList.toggle('off', AU.toggle());
 
@@ -230,7 +247,7 @@ const T = {
     <p class="env-line">${nl(g('envelope.line'))}</p>`,
   garden: () => {
     const days = Math.floor((Date.now() - Date.parse(g('since'))) / 864e5);
-    return `<p class="kicker">${esc(g('garden.kicker', 'ফুলের বাগান'))}</p><h2>${esc(g('garden.title'))}</h2><p class="sub">${nl(g('garden.sub'))}</p>
+    return `<p class="kicker">${esc(g('garden.kicker'))}</p><h2>${esc(g('garden.title'))}</h2><p class="sub">${nl(g('garden.sub'))}</p>
       ${days > 0 && !g('hideCounter', false) ? `<div class="counter"><small>${esc(g('sinceLabel', 'একসঙ্গে'))}</small><b data-to="${days}">০</b><span>দিন</span>
         <div class="hms"><i data-k="h">০</i> ঘণ্টা <i data-k="m">০</i> মিনিট <i data-k="s">০</i> সেকেন্ড</div></div>` : ''}
       <div class="garden-glow"></div><div class="garden-rays"></div><canvas class="garden-cv" aria-label="গোলাপবাগান"></canvas>`;
@@ -290,7 +307,10 @@ const T = {
       <p class="fin-line">${nl(g('finale.line'))}</p>
       <p class="final-sign">${[g('finale.love', 'ভালোবাসি, অনেক।'), g('finale.sign', g('from'))].filter(Boolean).map(esc).join('<br>')}</p>
       <p class="fin-secret"></p>
-      <button class="again" type="button" aria-label="আবার শুরু থেকে"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg></button>
+      <div class="fin-btns">
+        <button class="again" type="button" aria-label="আবার শুরু থেকে"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg></button>
+        <button class="again bye" type="button" aria-label="শেষ"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
     </div>`
 };
 
@@ -444,6 +464,7 @@ const B = {
   },
   cake(el) {
     const candles = $$('.candle', el), wrap = $('.cake-wrap', el); let done = false;
+    AU.fadeOut(3);   // কেকের সামনে চুপচাপ; মোমবাতি নিভলে শুধু জন্মদিনের গান
     const check = () => {
       if (done || candles.some(c => !c.classList.contains('out'))) return;
       done = true; wrap.classList.add('dark'); vib([30, 60, 30]);
@@ -487,7 +508,18 @@ const B = {
     if (AUTO) later(open, 400);
   },
   finale(el) {
-    FX.petals(false);
+    FX.petals(false); AU.fadeOut(1.5);
+    // শেষ: সব শব্দ আর নড়াচড়া থেমে অন্ধকারে একটা ধিকিধিকি হৃদয়; ব্রাউজার দিলে জানালাও বন্ধ হয়
+    $('.bye', el).onclick = e => {
+      e.stopPropagation(); AU.fadeOut(1.2);
+      const end = document.createElement('div'); end.className = 'theend'; end.innerHTML = HEART(46, '#f2a24a');
+      document.body.appendChild(end); requestAnimationFrame(() => end.classList.add('on'));
+      setTimeout(() => {
+        timers.forEach(t => { clearTimeout(t); clearInterval(t); }); timers = [];
+        cleanups.forEach(f => { try { f(); } catch (x) { } }); cleanups = []; FX.petals(false); AU.stop();
+        try { window.close(); } catch (x) { }
+      }, 1400);
+    };
     const fin = $('.fin', el);
     cleanups.push(Magic.Fireworks($('.fw-cv', el), {
       textDelay: 2.6,
