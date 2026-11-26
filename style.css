@@ -472,3 +472,9 @@ h2{font-family:var(--disp);font-size:clamp(25px,6.6vw,36px);line-height:1.5;lett
 /* সম্পাদনার পাতায় বন্ধ করা (বা খালি) লেখার জায়গা পুরো উঠে যায় */
 .kicker:empty,h2:empty,.sub:empty,.sky-line:empty,.env-line:empty,.env-card .script:empty,.env-card .nm:empty,
 .l-greet:empty,.l-close:empty,.l-sign:empty,.fin-line:empty,.final-sign:empty,.wish .script:empty,.counter small:empty,.g-name:empty,.g-q:empty{display:none}
+
+/* কেক: কোন মোমবাতি ছুঁতে হবে, লেখা ছাড়া আলোর ঢেউয়ে বোঝানো */
+.candle.hint::before,.candle.hint::after{content:'';position:absolute;left:50%;bottom:50px;width:38px;height:38px;margin-left:-19px;border-radius:50%;pointer-events:none;
+  border:1.5px solid rgba(255,220,160,.85);box-shadow:0 0 12px rgba(255,180,90,.45);animation:ring 1.8s ease-out infinite}
+.candle.hint::after{animation-delay:.9s}
+.candle.out::before{display:none}

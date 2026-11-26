@@ -453,7 +453,11 @@ const B = {
       later(() => FX.burst(innerWidth / 2, innerHeight * .3, 90), 1800);
       showNext(4500);
     };
-    const blow = c => { if (c && !c.classList.contains('out')) { c.classList.add('out'); AU.pop(); vib(10); check(); } };
+    // লেখা ছাড়া ইঙ্গিত: জ্বলন্ত প্রথম মোমবাতির শিখার চারপাশে আলোর ঢেউ; নিভলে পরেরটায় সরে যায়
+    const hint = () => { candles.forEach(c => c.classList.remove('hint')); const n = candles.find(c => !c.classList.contains('out')); if (n) n.classList.add('hint'); };
+    later(hint, 1600);
+    showNext(25000);   // কেউ না ছুঁলেও আটকে থাকবে না
+    const blow = c => { if (c && !c.classList.contains('out')) { c.classList.add('out'); AU.pop(); vib(10); hint(); check(); } };
     // শিখা ছুঁলে সেটা নেভে; কেকের যেকোনো জায়গায় ছুঁলে পরের জ্বলন্তটা নেভে
     wrap.onclick = e => { if (e.target.closest('.secret')) return; const c = e.target.closest('.candle'); blow(c || candles.find(x => !x.classList.contains('out'))); };
     if (AUTO) candles.forEach((c, i) => later(() => blow(c), 400 + i * 150));
