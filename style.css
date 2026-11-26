@@ -485,3 +485,11 @@ h2{font-family:var(--disp);font-size:clamp(25px,6.6vw,36px);line-height:1.5;lett
 .theend{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:#070201 radial-gradient(circle at 50% 50%,rgba(110,36,8,.32) 0,rgba(60,18,4,.12) 22vmax,transparent 45vmax);opacity:0;transition:opacity 1.3s ease}
 .theend.on{opacity:1}
 .theend svg{filter:drop-shadow(0 0 20px rgba(255,150,70,.55));animation:beat 2.4s ease-in-out infinite}
+
+/* শুরুর ছোঁয়ার হৃদয় (লেখা ছাড়া; ছুঁলে সুর শুরু) */
+.intro-heart{position:relative;width:120px;height:120px;border-radius:50%;border:0;padding:0;background:none;cursor:pointer;display:grid;place-items:center;
+  animation:beat 1.8s ease-in-out infinite;filter:drop-shadow(0 0 22px rgba(255,150,70,.6))}
+.intro-heart::before,.intro-heart::after{content:'';position:absolute;inset:14px;border-radius:50%;border:1.5px solid rgba(255,214,150,.7);animation:ring 2.2s ease-out infinite;pointer-events:none}
+.intro-heart::after{animation-delay:1.1s}
+.intro-heart.go{animation:pop .75s cubic-bezier(.3,1.5,.5,1) forwards}
+.intro-heart.go::before,.intro-heart.go::after{display:none}

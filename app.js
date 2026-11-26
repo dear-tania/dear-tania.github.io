@@ -210,6 +210,7 @@ const hasGate = () => shownItems(g('gate.answers', [])).length > 0 && g('gate.qu
 const locked = () => !PREVIEW && g('lock', false) && Date.now() < Date.parse(g('birthday'));
 const NEXT = { stars: 'চলো', envelope: 'চলো, এগোই', garden: 'আমাদের গল্প দেখো', memories: 'তোমার জন্য একটা চিঠি', letter: 'আরও কিছু বলার আছে', reasons: 'কেকটা এসে গেছে', cake: 'উপহার', gift: 'শেষ চমক' };
 const ALL = ['stars', 'envelope', 'garden', 'memories', 'letter', 'reasons', 'cake', 'gift', 'finale'];
+const PRE = ['gate', 'countdown', 'intro'];   // উপরের দাগে গোনা হয় না
 const nameText = () => g('name', 'Tania');
 const skyName = () => g('stars.name', nameText());   // তারার আকাশে আলাদা নাম (খালি থাকলে মূল নাম)
 const envName = () => g('envelope.name', nameText()); // খামের কার্ডের নাম
@@ -228,6 +229,8 @@ const T = {
       </form>
       <p class="g-msg" aria-live="polite"></p>
     </div>`,
+  intro: () => `
+    <button class="intro-heart" type="button" aria-label="শুরু">${HEART(64, '#ff9a52')}</button>`,
   countdown: () => `
     <p class="kicker">${esc(g('countdown.kicker', 'আর একটু অপেক্ষা…'))}</p>
     <h2>${esc(g('countdown.title', 'তোমার দিনটা আসছে'))}</h2>
@@ -343,6 +346,15 @@ const B = {
         tries++; card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); vib(60);
         msg.textContent = tries >= 2 && g('gate.hint') ? g('gate.hint') : 'উঁহু, আরেকবার ভাবো 🙂';
       }
+    };
+  },
+  intro(el) {
+    const h = $('.intro-heart', el); let done = false;
+    h.onclick = () => {
+      if (done) return; done = true;
+      AU.init(); AU.ambient(g('music', '')); AU.chime(); vib([15, 40, 15]);
+      h.classList.add('go'); const r = h.getBoundingClientRect(); FX.burst(r.left + r.width / 2, r.top + r.height / 2, 70);
+      later(() => go(cur + 1), 750);
     };
   },
   countdown(el) {
@@ -539,7 +551,7 @@ const B = {
         : found.size ? `তুমি ${bn(found.size)}টা লুকানো হৃদয় খুঁজে পেয়েছ।<br>আরও ${bn(secretTotal - found.size)}টা কোথাও লুকিয়ে আছে…`
         : `এই পাতার কোথাও ${bn(secretTotal)}টা ছোট্ট হৃদয় লুকিয়ে আছে…`;
     }
-    $('.again', el).onclick = e => { e.stopPropagation(); go(scenes.findIndex(s => s !== 'gate' && s !== 'countdown')); };
+    $('.again', el).onclick = e => { e.stopPropagation(); go(scenes.findIndex(s => !PRE.includes(s))); };
   }
 };
 
@@ -556,10 +568,12 @@ function build(want) {
   const vis = n => PREVIEW || !isHidden(n);
   if (hasGate() && vis('gate') && (!PREVIEW || want === 'gate')) scenes.push('gate');
   if (locked()) scenes.push('countdown');
+  // ব্রাউজার একবার ছোঁয়ার আগে শব্দ বাজাতে দেয় না: তাই শুরুতে ছোঁয়ার হৃদয় (গোপন প্রশ্ন থাকলে সেটাই ছোঁয়া)
+  if (!PREVIEW && !scenes.includes('gate')) scenes.push('intro');
   scenes.push(...ALL.filter(vis));
-  if (!scenes.some(s => s !== 'gate' && s !== 'countdown')) scenes.push('envelope');
+  if (!scenes.some(s => !PRE.includes(s))) scenes.push('envelope');
   stage.innerHTML = scenes.map(n => `<section class="scene s-${n}" data-s="${n}"></section>`).join('');
-  const shown = scenes.filter(s => s !== 'gate' && s !== 'countdown');
+  const shown = scenes.filter(s => !PRE.includes(s));
   dotsEl.innerHTML = shown.map(() => '<i></i>').join('');
   cur = -1; planSecrets();
 }
@@ -574,7 +588,7 @@ function go(i) {
   cur = i; const name = scenes[i], el = $(`[data-s="${name}"]`, stage);
   el.innerHTML = `<div class="wrap">${T[name]()}</div>` + (PREVIEW && isHidden(name) ? '<div class="hid-badge">লুকানো অংশ: তানিয়া এটা দেখবেন না</div>' : ''); el.scrollTop = 0;
   FX.petals(['garden', 'memories', 'letter', 'reasons', 'cake', 'gift'].includes(name));
-  const shown = scenes.filter(s => s !== 'gate' && s !== 'countdown'), k = shown.indexOf(name);
+  const shown = scenes.filter(s => !PRE.includes(s)), k = shown.indexOf(name);
   topEl.classList.toggle('hide', k < 0);
   trackEl.hidden = k < 0 || !secretTotal;
   [...dotsEl.children].forEach((d, j) => { d.className = j < k ? 'done' : j === k ? 'cur' : ''; });
